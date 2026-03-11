@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, MessageSquare } from 'lucide-react'
 import { api, Log, LogFullDetail } from '../lib/api'
 import { SeverityBadge, CategoryBadge, Timestamp, Spinner, ErrorBox } from '../components/ui'
 
-export default function LogStream() {
+interface LogStreamProps {
+  onOpenChat?: (log: LogFullDetail) => void
+}
+
+export default function LogStream({ onOpenChat }: LogStreamProps) {
   const [logs, setLogs] = useState<Log[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -119,7 +123,19 @@ export default function LogStream() {
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Log Detail</div>
                 <span className="td-mono text-sm text-muted">{selected?.id}</span>
               </div>
-              <button className="detail-close" onClick={() => setSelected(null)}><X /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {selected && onOpenChat && (
+                  <button
+                    className="btn btn-teal"
+                    style={{ fontSize: 12, padding: '5px 12px' }}
+                    onClick={() => { onOpenChat(selected); setSelected(null) }}
+                  >
+                    <MessageSquare size={13} />
+                    Ask AI
+                  </button>
+                )}
+                <button className="detail-close" onClick={() => setSelected(null)}><X /></button>
+              </div>
             </div>
 
             {detailLoading ? <Spinner /> : selected && (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   LayoutDashboard, Activity, AlertTriangle,
-  Shield, Wrench, Radio, ChevronRight
+  Shield, Wrench, Radio, ChevronRight, MessageSquare, BrainCircuit
 } from 'lucide-react'
 import Overview from './pages/Overview'
 import LogStream from './pages/LogStream'
@@ -9,9 +9,12 @@ import Threats from './pages/Threats'
 import Incidents from './pages/Incidents'
 import Remediation from './pages/Remediation'
 import AgentMonitor from './pages/AgentMonitor'
+import AgentChat from './pages/AgentChat'
+import AIAnalyst from './pages/AIAnalyst'
+import { LogFullDetail } from './lib/api'
 import './index.css'
 
-type Page = 'overview' | 'logs' | 'threats' | 'incidents' | 'remediation' | 'agents'
+type Page = 'overview' | 'analyst' | 'logs' | 'threats' | 'incidents' | 'remediation' | 'agents' | 'chat'
 
 interface NavItem {
   id: Page
@@ -21,6 +24,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: 'overview',    label: 'Overview',      icon: <LayoutDashboard size={15} /> },
+  { id: 'analyst',     label: 'AI Analyst',    icon: <BrainCircuit size={15} /> },
   { id: 'logs',        label: 'Log Stream',    icon: <Activity size={15} /> },
   { id: 'threats',     label: 'Threats',       icon: <AlertTriangle size={15} /> },
   { id: 'incidents',   label: 'Incidents',     icon: <Shield size={15} /> },
@@ -30,27 +34,26 @@ const NAV: NavItem[] = [
 
 const PAGE_TITLES: Record<Page, string> = {
   overview:    'Overview',
+  analyst:     'AI Analyst',
   logs:        'Log Stream',
   threats:     'Threat Assessments',
   incidents:   'Incidents',
   remediation: 'Remediation',
   agents:      'Agent Monitor',
+  chat:        'Analyst Chat',
 }
 
 export default function App() {
   const [page, setPage] = useState<Page>('overview')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [chatContext, setChatContext] = useState<LogFullDetail | null>(null)
 
   function refresh() { setRefreshKey(k => k + 1) }
 
-  const PageComponent = {
-    overview:    Overview,
-    logs:        LogStream,
-    threats:     Threats,
-    incidents:   Incidents,
-    remediation: Remediation,
-    agents:      AgentMonitor,
-  }[page]
+  function openChat(log?: LogFullDetail) {
+    setChatContext(log ?? null)
+    setPage('chat')
+  }
 
   return (
     <div className="layout">
@@ -82,6 +85,15 @@ export default function App() {
               {item.label}
             </button>
           ))}
+
+          <div className="nav-section-label" style={{ marginTop: 8 }}>Assistant</div>
+          <button
+            className={`nav-item ${page === 'chat' ? 'active' : ''}`}
+            onClick={() => openChat()}
+          >
+            <MessageSquare size={15} />
+            Analyst Chat
+          </button>
         </nav>
 
         <div className="sidebar-footer">
@@ -96,22 +108,48 @@ export default function App() {
             <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Aurora</span>
             <ChevronRight size={13} color="var(--ink-3)" />
             <span className="topbar-title">{PAGE_TITLES[page]}</span>
+            {page === 'chat' && chatContext && (
+              <>
+                <ChevronRight size={13} color="var(--ink-3)" />
+                <span style={{ fontSize: 12, color: 'var(--teal)', fontFamily: 'var(--font-mono)' }}>
+                  {chatContext.id.slice(0, 12)}…
+                </span>
+              </>
+            )}
           </div>
           <div className="topbar-right">
             <span style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
               {new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </span>
-            <button className="refresh-btn" onClick={refresh}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 13, height: 13 }}>
-                <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-              </svg>
-              Refresh
-            </button>
+            {page !== 'chat' && (
+              <button className="refresh-btn" onClick={refresh}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 13, height: 13 }}>
+                  <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>
+                Refresh
+              </button>
+            )}
           </div>
         </header>
 
-        <main className="page-content">
-          <PageComponent key={refreshKey} />
+        <main className={page === 'chat' || page === 'analyst' ? '' : 'page-content'} style={page === 'chat' || page === 'analyst' ? { flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '24px 28px' } : {}}>
+          {page === 'chat' ? (
+            <AgentChat logContext={chatContext} />
+          ) : page === 'analyst' ? (
+            <AIAnalyst />
+          ) : page === 'logs' ? (
+            <LogStream key={refreshKey} onOpenChat={openChat} />
+          ) : page === 'overview' ? (
+            <Overview key={refreshKey} />
+          ) : page === 'threats' ? (
+            <Threats key={refreshKey} />
+          ) : page === 'incidents' ? (
+            <Incidents key={refreshKey} />
+          ) : page === 'remediation' ? (
+            <Remediation key={refreshKey} />
+          ) : (
+            <AgentMonitor key={refreshKey} />
+          )}
         </main>
       </div>
     </div>
