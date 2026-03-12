@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, MessageSquare } from 'lucide-react'
 import { api, Log } from '../lib/api'
 import { SeverityBadge, Timestamp, Spinner, ErrorBox } from '../components/ui'
 
-export default function LogStream() {
+interface LogStreamProps {
+  onAskAI?: (logId: string, context: string) => void
+}
+
+export default function LogStream({ onAskAI }: LogStreamProps) {
   const [logs, setLogs] = useState<Log[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -13,7 +17,8 @@ export default function LogStream() {
   const LIMIT = 50
 
   async function load(o = 0) {
-    setLoading(true); setError(null)
+    if (logs.length === 0) setLoading(true)
+    setError(null)
     try {
       const data = await api.logs.list(LIMIT, o)
       const unfiltered = data.filter(l => l.processing_stage === 'unfiltered')
@@ -83,7 +88,7 @@ export default function LogStream() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading && filtered.length === 0 ? (
                 <tr className="loading-row"><td colSpan={7}>Loading...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr className="loading-row"><td colSpan={7}>No unfiltered logs yet. Start the ingestor to see data here.</td></tr>
@@ -120,7 +125,25 @@ export default function LogStream() {
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Raw Log</div>
                 <span className="td-mono text-sm text-muted">{selected.trace_id ?? selected.id}</span>
               </div>
-              <button className="detail-close" onClick={() => setSelected(null)}><X /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {onAskAI && (
+                  <button
+                    className="btn btn-teal"
+                    style={{ fontSize: 12, padding: '5px 12px' }}
+                    onClick={() => {
+                      onAskAI(
+                        selected.id,
+                        `Raw log from service "${selected.service_name}": ${selected.message}`
+                      )
+                      setSelected(null)
+                    }}
+                  >
+                    <MessageSquare size={13} />
+                    Ask AI
+                  </button>
+                )}
+                <button className="detail-close" onClick={() => setSelected(null)}><X /></button>
+              </div>
             </div>
 
             <div className="detail-section">
