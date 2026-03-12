@@ -144,7 +144,7 @@ export default function App() {
           ) : page === 'analyst' ? (
             <AIAnalyst key={analystMessage} initialMessage={analystMessage} />
           ) : page === 'logs' ? (
-            <LogStream key={refreshKey} onOpenChat={openChat} />
+            <LogStream key={refreshKey} />
           ) : page === 'overview' ? (
             <Overview key={refreshKey} />
           ) : page === 'threats' ? (
