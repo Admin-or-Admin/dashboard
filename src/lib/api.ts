@@ -131,6 +131,15 @@ export const api = {
   remediation: {
     list: (limit = 100, offset = 0) => get<RemediationStep[]>('/remediation', { limit, offset }),
     byLog: (log_id: string) => get<RemediationStep[]>(`/remediation/log/${log_id}`),
+    updateStatus: async (id: number, status: 'approved' | 'denied') => {
+      const res = await fetch(`${BASE_URL}/remediation/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      return res.json()
+    },
   },
   stats: {
     severity: () => get<SeverityStat[]>('/stats/severity'),
