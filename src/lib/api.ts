@@ -111,6 +111,22 @@ export interface LogFullDetail extends LogDetail {
   incident: Incident | null
 }
 
+export interface ChatMessage {
+  id?: number
+  session_id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+}
+
+export interface ChatSession {
+  id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+  messages: ChatMessage[]
+}
+
 // used for the charts on the overview page
 export interface SeverityStat { severity: string; count: number }
 export interface TrendPoint { date: string; count: number }
@@ -126,6 +142,35 @@ export const api = {
     get: (id: string) => get<Log>(`/logs/${id}`),
     details: (id: string) => get<LogDetail>(`/logs/${id}/details`), // log + classification + threat
     full: (id: string) => get<LogFullDetail>(`/logs/${id}/full`),   // everything including incident + remediation
+  },
+  chats: {
+    list: () => get<ChatSession[]>('/chats'),
+    get: (id: string) => get<ChatSession>(`/chats/${id}`),
+    create: async (id: string, title?: string) => {
+      const res = await fetch(`${BASE_URL}/chats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title }),
+      })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      return res.json()
+    },
+    addMessage: async (sessionId: string, role: 'user' | 'assistant', content: string) => {
+      const res = await fetch(`${BASE_URL}/chats/${sessionId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, content }),
+      })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      return res.json()
+    },
+    delete: async (id: string) => {
+      const res = await fetch(`${BASE_URL}/chats/${id}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      return res.json()
+    },
   },
   classifications: {
     list: (limit = 100, offset = 0) => get<Classification[]>('/classifications', { limit, offset }),

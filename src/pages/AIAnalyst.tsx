@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Send, Bot, User, ChevronDown, Search, FileText, X, Loader, Wrench } from 'lucide-react'
 import { api, Log } from '../lib/api'
+import { ChatSidebar } from '../components/ChatSidebar'
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
@@ -502,6 +503,7 @@ const SUGGESTIONS = [
 ]
 
 export default function AIAnalyst({ initialMessage }: { initialMessage?: string }) {
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -518,6 +520,43 @@ export default function AIAnalyst({ initialMessage }: { initialMessage?: string 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [displayMessages, loading])
+
+  // Load session messages when sessionId changes
+  useEffect(() => {
+    if (sessionId) {
+      loadSession(sessionId)
+    } else {
+      setMessages([])
+      setDisplayMessages([])
+    }
+  }, [sessionId])
+
+  async function loadSession(id: string) {
+    setLoading(true)
+    try {
+      const session = await api.chats.get(id)
+      // Map API messages to UI ChatMessage format
+      const history: ChatMessage[] = session.messages.map(m => ({
+        role: m.role as any,
+        content: m.content
+      }))
+      setMessages(history)
+      // For display, we skip system/tool messages usually but here we just show user/assistant
+      setDisplayMessages(history.filter(m => m.role === 'user' || m.role === 'assistant'))
+    } catch (err) {
+      console.error('Failed to load session:', err)
+      setError('Failed to load conversation history')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleNewChat() {
+    setSessionId(null)
+    setMessages([])
+    setDisplayMessages([])
+    didAutoSend.current = false
+  }
 
   // Auto-send initial message if provided (e.g. from Threats or Incidents page)
   useEffect(() => {
@@ -640,14 +679,26 @@ Ask me anything about the system, paste a raw log for analysis, or select a spec
     setError(null)
     setShowPicker(false)
 
-    if (messages.length === 0) {
+    let currentSessionId = sessionId
+    if (!currentSessionId) {
+      currentSessionId = crypto.randomUUID()
+      await api.chats.create(currentSessionId, text.slice(0, 40) + (text.length > 40 ? '...' : ''))
+      setSessionId(currentSessionId)
+    }
+
+    if (displayMessages.length === 0) {
       // First message — add greeting to display
-      addDisplay({ role: 'assistant', content: buildInitialGreeting() })
+      const greeting = buildInitialGreeting()
+      addDisplay({ role: 'assistant', content: greeting })
+      await api.chats.addMessage(currentSessionId, 'assistant', greeting)
     }
 
     const userMsg: ChatMessage = { role: 'user', content: text }
     addDisplay(userMsg)
     setLoading(true)
+    
+    // Save user message to DB
+    await api.chats.addMessage(currentSessionId, 'user', text)
 
     const newHistory = [...messages, userMsg]
     setMessages(newHistory)
@@ -655,6 +706,12 @@ Ask me anything about the system, paste a raw log for analysis, or select a spec
     try {
       const finalHistory = await runAgent(text, newHistory)
       setMessages(finalHistory)
+      
+      // Save the final assistant response to DB
+      const lastMsg = finalHistory[finalHistory.length - 1]
+      if (lastMsg.role === 'assistant' && lastMsg.content) {
+        await api.chats.addMessage(currentSessionId, 'assistant', lastMsg.content)
+      }
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -678,9 +735,15 @@ Ask me anything about the system, paste a raw log for analysis, or select a spec
   const isEmpty = displayMessages.length === 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <ChatSidebar 
+        currentSessionId={sessionId} 
+        onSelectSession={setSessionId} 
+        onNewChat={handleNewChat} 
+      />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', padding: '16px' }}>
 
-      {/* No API key warning */}
+        {/* No API key warning */}
       {!OPENAI_KEY && (
         <div style={{
           background: 'var(--amber-light)', border: '1px solid #FCD34D',
@@ -890,6 +953,7 @@ Ask me anything about the system, paste a raw log for analysis, or select a spec
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
     </div>
   )
 }

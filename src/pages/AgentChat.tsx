@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Send, Bot, User, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
-import { LogFullDetail } from '../lib/api'
+import { api, LogFullDetail } from '../lib/api'
 import { SeverityBadge, CategoryBadge, PriorityBar, Timestamp } from '../components/ui'
+import { ChatSidebar } from '../components/ChatSidebar'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -319,6 +320,7 @@ function LogSidebar({ log }: { log: LogFullDetail }) {
 }
 
 export default function AgentChat({ logContext }: AgentChatProps) {
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -326,20 +328,12 @@ export default function AgentChat({ logContext }: AgentChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Inject opening message when log context is provided
+  // Load session messages when sessionId changes
   useEffect(() => {
-    if (logContext) {
-      setMessages([{
-        role: 'assistant',
-        content: `I have full context on log \`${logContext.id.slice(0, 12)}…\` from **${logContext.service_name ?? 'unknown service'}**.
-
-${logContext.classification ? `It was classified as **${logContext.classification.severity?.toUpperCase()} ${logContext.classification.category}** with ${logContext.classification.confidence}% confidence.` : ''}
-${logContext.threat_assessment ? `The threat assessment identifies **${logContext.threat_assessment.attack_vector}** as the attack vector with priority **${logContext.threat_assessment.priority}/5**.` : ''}
-
-What would you like to know? I can help you understand what happened, assess the risk, walk through the remediation steps, or discuss broader implications.`,
-        timestamp: new Date(),
-      }])
-    } else {
+    if (sessionId) {
+      loadSession(sessionId)
+    } else if (!logContext) {
+      // Default greeting for a blank new chat
       setMessages([{
         role: 'assistant',
         content: `I am your cybersecurity analyst assistant. I can help you investigate logs, understand threats, interpret attack patterns, advise on remediation steps, or answer any security operations questions.
@@ -347,6 +341,47 @@ What would you like to know? I can help you understand what happened, assess the
 You can also open me directly from a specific log in the Log Stream page to get pre-loaded context.
 
 What can I help you with?`,
+        timestamp: new Date(),
+      }])
+    }
+  }, [sessionId])
+
+  async function loadSession(id: string) {
+    setLoading(true)
+    try {
+      const session = await api.chats.get(id)
+      setMessages(session.messages.map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        timestamp: new Date(m.timestamp)
+      })))
+    } catch (err) {
+      console.error('Failed to load session:', err)
+      setError('Failed to load conversation history')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleNewChat() {
+    setSessionId(null)
+    setMessages([])
+    // Reset greeting based on context if any
+  }
+
+  // Inject opening message when log context is provided
+  useEffect(() => {
+    if (logContext) {
+      const initial = `I have full context on log \`${logContext.id.slice(0, 12)}…\` from **${logContext.service_name ?? 'unknown service'}**.
+
+${logContext.classification ? `It was classified as **${logContext.classification.severity?.toUpperCase()} ${logContext.classification.category}** with ${logContext.classification.confidence}% confidence.` : ''}
+${logContext.threat_assessment ? `The threat assessment identifies **${logContext.threat_assessment.attack_vector}** as the attack vector with priority **${logContext.threat_assessment.priority}/5**.` : ''}
+
+What would you like to know? I can help you understand what happened, assess the risk, walk through the remediation steps, or discuss broader implications.`
+      
+      setMessages([{
+        role: 'assistant',
+        content: initial,
         timestamp: new Date(),
       }])
     }
@@ -360,11 +395,26 @@ What can I help you with?`,
     const text = input.trim()
     if (!text || loading) return
 
+    let currentSessionId = sessionId
+    if (!currentSessionId) {
+      currentSessionId = crypto.randomUUID()
+      await api.chats.create(currentSessionId, text.slice(0, 40) + (text.length > 40 ? '...' : ''))
+      setSessionId(currentSessionId)
+      
+      // Save the initial greeting if it exists
+      if (messages.length > 0 && messages[0].role === 'assistant') {
+        await api.chats.addMessage(currentSessionId, 'assistant', messages[0].content)
+      }
+    }
+
     const userMsg: Message = { role: 'user', content: text, timestamp: new Date() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setLoading(true)
     setError(null)
+
+    // Save user message
+    await api.chats.addMessage(currentSessionId, 'user', text)
 
     try {
       const history = [...messages, userMsg].map(m => ({
@@ -396,6 +446,9 @@ What can I help you with?`,
 
       const data = await res.json()
       const reply = data.choices?.[0]?.message?.content ?? 'No response.'
+
+      // Save assistant message
+      await api.chats.addMessage(currentSessionId, 'assistant', reply)
 
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -431,6 +484,11 @@ What can I help you with?`,
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <ChatSidebar 
+        currentSessionId={sessionId} 
+        onSelectSession={setSessionId} 
+        onNewChat={handleNewChat} 
+      />
       {/* Chat area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 

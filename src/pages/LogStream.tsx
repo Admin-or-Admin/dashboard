@@ -17,8 +17,7 @@ export default function LogStream({ onAskAI }: LogStreamProps) {
   const LIMIT = 50
 
   async function load(o = 0) {
-    if (logs.length === 0) setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const data = await api.logs.list(LIMIT, o)
       const unfiltered = data.filter(l => l.processing_stage === 'unfiltered')
