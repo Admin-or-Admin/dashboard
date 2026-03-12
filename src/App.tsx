@@ -103,7 +103,7 @@ export default function App() {
         </nav>
 
         <div className="sidebar-footer">
-          v1.0.0 · Aurora
+          v0.0.1 · Aurora
         </div>
       </aside>
 

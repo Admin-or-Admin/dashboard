@@ -1,5 +1,8 @@
+// gateway runs on 8000 locally, override with VITE_API_URL in .env
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+// generic GET wrapper, builds the full URL with query params and parses the JSON response
+// T is whatever type we expect back (Log[], Incident, etc.)
 async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
   const url = new URL(BASE_URL + path)
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
@@ -10,6 +13,7 @@ async function get<T>(path: string, params?: Record<string, string | number>): P
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// mirrors the logs table in postgres — raw log as it came off kafka
 export interface Log {
   id: string
   timestamp: string
@@ -21,20 +25,22 @@ export interface Log {
   http_status: number | null
   process_pid: number | null
   trace_id: string | null
-  processing_stage: string | null
+  processing_stage: string | null // "unfiltered" means it hasn't been touched by the agents yet
 }
 
+// what the classifier agent writes after processing a log
 export interface Classification {
   log_id: string
   category: string | null
   severity: string | null
   is_cybersecurity: boolean | null
-  confidence: number | null
+  confidence: number | null // 0-100
   reasoning: string | null
   tags: string[] | null
   created_at: string
 }
 
+// what the analyst agent writes, deeper threat analysis on top of classification
 export interface ThreatAssessment {
   log_id: string
   attack_vector: string | null
@@ -44,15 +50,16 @@ export interface ThreatAssessment {
   confidence: number | null
   auto_fixable: boolean | null
   requires_approval: boolean | null
-  priority: number | null
+  priority: number | null // 1-5, 5 is most urgent
   notify_teams: string[] | null
   created_at: string
 }
 
+// final output from the responder agent
 export interface Incident {
   incident_id: string
   log_id: string
-  resolution_mode: string | null
+  resolution_mode: string | null // "autonomous" or "manual"
   executive_summary: string | null
   outcome: string | null
   resolved_by: string | null
@@ -63,23 +70,25 @@ export interface Incident {
   resolved_at: string
 }
 
+// individual steps the responder generated to fix the incident
 export interface RemediationStep {
   id: number
   log_id: string
   step_number: number | null
   title: string | null
   description: string | null
-  command: string | null
-  risk: string | null
+  command: string | null // actual shell command to run
+  risk: string | null // low / medium / high
   estimated_time: string | null
-  rollback: string | null
+  rollback: string | null // how to undo this step if it goes wrong
   auto_execute: boolean | null
   requires_approval: boolean | null
-  status: string | null
+  status: string | null // pending / approved / denied / auto
   executed_at: string | null
   created_at: string
 }
 
+// follow-up tasks created after an incident is resolved
 export interface FollowUpAction {
   id: number
   incident_id: string
@@ -90,29 +99,33 @@ export interface FollowUpAction {
   created_at: string
 }
 
+// log + its classification + threat assessment joined together
 export interface LogDetail extends Log {
   classification: Classification | null
   threat_assessment: ThreatAssessment | null
 }
 
+// everything about a log in one shot — used for the detail panel
 export interface LogFullDetail extends LogDetail {
   remediation_steps: RemediationStep[]
   incident: Incident | null
 }
 
+// used for the charts on the overview page
 export interface SeverityStat { severity: string; count: number }
 export interface TrendPoint { date: string; count: number }
 export interface ServiceStat { service_name: string; count: number }
 
 // ── API calls ─────────────────────────────────────────────────────────────────
 
+// all gateway calls go through here, one place to change if the gateway moves
 export const api = {
   logs: {
     list: (limit = 100, offset = 0, service_name?: string) =>
       get<Log[]>('/logs', service_name ? { limit, offset, service_name } : { limit, offset }),
     get: (id: string) => get<Log>(`/logs/${id}`),
-    details: (id: string) => get<LogDetail>(`/logs/${id}/details`),
-    full: (id: string) => get<LogFullDetail>(`/logs/${id}/full`),
+    details: (id: string) => get<LogDetail>(`/logs/${id}/details`), // log + classification + threat
+    full: (id: string) => get<LogFullDetail>(`/logs/${id}/full`),   // everything including incident + remediation
   },
   classifications: {
     list: (limit = 100, offset = 0) => get<Classification[]>('/classifications', { limit, offset }),
@@ -131,6 +144,7 @@ export const api = {
   remediation: {
     list: (limit = 100, offset = 0) => get<RemediationStep[]>('/remediation', { limit, offset }),
     byLog: (log_id: string) => get<RemediationStep[]>(`/remediation/log/${log_id}`),
+    // PATCH endpoint, writes approval decision to the db
     updateStatus: async (id: number, status: 'approved' | 'denied') => {
       const res = await fetch(`${BASE_URL}/remediation/${id}`, {
         method: 'PATCH',
@@ -142,6 +156,7 @@ export const api = {
     },
   },
   stats: {
+    // these three feed the charts on the overview page
     severity: () => get<SeverityStat[]>('/stats/severity'),
     trend: () => get<TrendPoint[]>('/stats/incidents/trend'),
     services: () => get<ServiceStat[]>('/stats/services'),
