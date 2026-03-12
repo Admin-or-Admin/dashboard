@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, MessageSquare } from 'lucide-react'
 import { api, Incident, RemediationStep, FollowUpAction } from '../lib/api'
 import { Spinner, ErrorBox, Timestamp } from '../components/ui'
 
-export default function Incidents() {
+interface IncidentsProps {
+  onAskAI?: (logId: string, context: string) => void
+}
+
+export default function Incidents({ onAskAI }: IncidentsProps) {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -110,7 +114,25 @@ export default function Incidents() {
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Incident Detail</div>
                 <span className="td-mono text-sm text-muted">{selected.incident_id}</span>
               </div>
-              <button className="detail-close" onClick={() => setSelected(null)}><X /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {onAskAI && (
+                  <button
+                    className="btn btn-teal"
+                    style={{ fontSize: 12, padding: '5px 12px' }}
+                    onClick={() => {
+                      onAskAI(
+                        selected.log_id,
+                        `Incident ${selected.incident_id} on log ${selected.log_id}: "${selected.executive_summary}", outcome: ${selected.outcome}, root cause: ${selected.root_cause}`
+                      )
+                      setSelected(null)
+                    }}
+                  >
+                    <MessageSquare size={13} />
+                    Ask AI
+                  </button>
+                )}
+                <button className="detail-close" onClick={() => setSelected(null)}><X /></button>
+              </div>
             </div>
 
             {detailLoading ? <Spinner /> : (

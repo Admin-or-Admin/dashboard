@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, MessageSquare } from 'lucide-react'
 import { api, ThreatAssessment } from '../lib/api'
 import { SeverityBadge, PriorityBar, ConfidenceBar, Spinner, ErrorBox, Timestamp } from '../components/ui'
 
-export default function Threats() {
+interface ThreatsProps {
+  onAskAI?: (logId: string, context: string) => void
+}
+
+export default function Threats({ onAskAI }: ThreatsProps) {
   const [threats, setThreats] = useState<ThreatAssessment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -105,7 +109,25 @@ export default function Threats() {
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Threat Assessment</div>
                 <span className="td-mono text-sm text-muted">{selected.log_id}</span>
               </div>
-              <button className="detail-close" onClick={() => setSelected(null)}><X /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {onAskAI && (
+                  <button
+                    className="btn btn-teal"
+                    style={{ fontSize: 12, padding: '5px 12px' }}
+                    onClick={() => {
+                      onAskAI(
+                        selected.log_id,
+                        `Threat on log ${selected.log_id}: attack vector "${selected.attack_vector}", priority ${selected.priority}/5, complexity ${selected.complexity}, auto-fixable: ${selected.auto_fixable}`
+                      )
+                      setSelected(null)
+                    }}
+                  >
+                    <MessageSquare size={13} />
+                    Ask AI
+                  </button>
+                )}
+                <button className="detail-close" onClick={() => setSelected(null)}><X /></button>
+              </div>
             </div>
 
             <div className="detail-section">

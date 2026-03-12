@@ -47,12 +47,18 @@ export default function App() {
   const [page, setPage] = useState<Page>('overview')
   const [refreshKey, setRefreshKey] = useState(0)
   const [chatContext, setChatContext] = useState<LogFullDetail | null>(null)
+  const [analystMessage, setAnalystMessage] = useState<string | undefined>(undefined)
 
   function refresh() { setRefreshKey(k => k + 1) }
 
   function openChat(log?: LogFullDetail) {
     setChatContext(log ?? null)
     setPage('chat')
+  }
+
+  function openAnalystWithContext(logId: string, context: string) {
+    setAnalystMessage(`Investigate log ID ${logId} in full detail. Context: ${context}`)
+    setPage('analyst')
   }
 
   return (
@@ -136,15 +142,15 @@ export default function App() {
           {page === 'chat' ? (
             <AgentChat logContext={chatContext} />
           ) : page === 'analyst' ? (
-            <AIAnalyst />
+            <AIAnalyst key={analystMessage} initialMessage={analystMessage} />
           ) : page === 'logs' ? (
             <LogStream key={refreshKey} onOpenChat={openChat} />
           ) : page === 'overview' ? (
             <Overview key={refreshKey} />
           ) : page === 'threats' ? (
-            <Threats key={refreshKey} />
+            <Threats key={refreshKey} onAskAI={openAnalystWithContext} />
           ) : page === 'incidents' ? (
-            <Incidents key={refreshKey} />
+            <Incidents key={refreshKey} onAskAI={openAnalystWithContext} />
           ) : page === 'remediation' ? (
             <Remediation key={refreshKey} />
           ) : (

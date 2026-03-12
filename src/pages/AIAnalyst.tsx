@@ -501,7 +501,7 @@ const SUGGESTIONS = [
   'What attack vectors are most common in our logs?',
 ]
 
-export default function AIAnalyst() {
+export default function AIAnalyst({ initialMessage }: { initialMessage?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -513,10 +513,19 @@ export default function AIAnalyst() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputAreaRef = useRef<HTMLDivElement>(null)
+  const didAutoSend = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [displayMessages, loading])
+
+  // Auto-send initial message if provided (e.g. from Threats or Incidents page)
+  useEffect(() => {
+    if (initialMessage && !didAutoSend.current && OPENAI_KEY) {
+      didAutoSend.current = true
+      send(initialMessage)
+    }
+  }, [initialMessage])
 
   function buildInitialGreeting() {
     return `I am your AI security analyst. I have live access to the entire CyberControl platform — logs, classifications, threat assessments, incidents, remediation steps, and statistics.
