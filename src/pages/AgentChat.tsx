@@ -14,7 +14,7 @@ interface AgentChatProps {
   logContext?: LogFullDetail | null
 }
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY ?? ''
+const OPENAI_API_KEY = (window as any).env?.VITE_OPENAI_API_KEY || import.meta.env.VITE_OPENAI_API_KEY || ''
 
 function buildSystemPrompt(log: LogFullDetail | null | undefined): string {
   if (!log) {

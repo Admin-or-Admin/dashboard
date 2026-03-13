@@ -491,7 +491,7 @@ function LogPicker({ onSelect, onClose }: { onSelect: (log: Log) => void; onClos
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const OPENAI_KEY = import.meta.env.VITE_OPENAI_API_KEY ?? ''
+const OPENAI_KEY = (window as any).env?.VITE_OPENAI_API_KEY || import.meta.env.VITE_OPENAI_API_KEY || ''
 
 const SUGGESTIONS = [
   'What is the current security posture of the system?',

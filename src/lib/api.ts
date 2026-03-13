@@ -1,5 +1,6 @@
 // gateway runs on 8000 locally, override with VITE_API_URL in .env
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+// We check window.env for runtime config (Docker), then fallback to Vite's build-time env
+const BASE_URL = (window as any).env?.VITE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 // generic GET wrapper, builds the full URL with query params and parses the JSON response
 // T is whatever type we expect back (Log[], Incident, etc.)

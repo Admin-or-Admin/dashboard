@@ -1,17 +1,16 @@
 # Build stage
 FROM node:20-slim AS build
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the package.json and package-lock.json files into the container at /app
-COPY package*.json ./
+# Copy the package.json and package-lock.json files
+COPY dashboard/package*.json ./
 
-# Install any needed packages specified in package.json
+# Install packages
 RUN npm install
 
-# Copy the current directory contents into the container at /app
-COPY . .
+# Copy the dashboard source
+COPY dashboard/ .
 
 # Build the Vite application
 RUN npm run build
@@ -22,8 +21,13 @@ FROM nginx:alpine
 # Copy the build output from the build stage to the nginx html directory
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Expose port 80 to the outside world
+# Copy entrypoint script
+COPY dashboard/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose port 80
 EXPOSE 80
 
-# Run nginx in the foreground
+# Use the entrypoint script to inject runtime environment variables
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
