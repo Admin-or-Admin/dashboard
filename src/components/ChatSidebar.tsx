@@ -144,8 +144,7 @@ export function ChatSidebar({ currentSessionId, onSelectSession, onNewChat }: Ch
                 gap: 10,
                 background: currentSessionId === session.id ? 'var(--rule)' : 'transparent',
                 transition: 'background 0.2s ease',
-                position: 'relative',
-                group: 'true' // trick for pseudo-class if we had tailwind
+                position: 'relative'
               }}
               onMouseEnter={(e) => {
                 const btn = e.currentTarget.querySelector('.delete-btn') as HTMLElement
