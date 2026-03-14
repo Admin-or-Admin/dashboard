@@ -1,33 +1,35 @@
 # Build stage
 FROM node:20-slim AS build
-
 WORKDIR /app
-
-# Copy the package.json and package-lock.json files
 COPY dashboard/package*.json ./
-
-# Install packages
 RUN npm install
-
-# Copy the dashboard source
 COPY dashboard/ .
-
-# Build the Vite application
 RUN npm run build
 
 # Serve stage
 FROM nginx:alpine
 
+# Install nodejs to run the config generator
+RUN apk add --no-cache nodejs
+
 # Copy the build output from the build stage to the nginx html directory
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy entrypoint script
-COPY dashboard/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copy the generator script
+COPY --from=build /app/generate-env.js /app/generate-env.js
 
-# Expose port 80
+# Set the output path for the runtime config
+ENV ENV_CONFIG_OUTPUT=/usr/share/nginx/html/env-config.js
+
+# Standard nginx config for SPA
+RUN echo 'server { \
+    listen 80; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html; \
+        try_files $uri $uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
-
-# Use the entrypoint script to inject runtime environment variables
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["sh", "-c", "node /app/generate-env.js && nginx -g 'daemon off;'"]

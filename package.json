@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "generate-env": "node ./generate-env.js",
+    "dev": "npm run generate-env && vite",
+    "build": "npm run generate-env && tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

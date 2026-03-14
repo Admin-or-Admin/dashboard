@@ -1,5 +1,4 @@
 // gateway runs on 8000 locally, override with VITE_API_URL in .env
-// We check window.env for runtime config (Docker), then fallback to Vite's build-time env
 const BASE_URL = (window as any).env?.VITE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 // generic GET wrapper, builds the full URL with query params and parses the JSON response
@@ -115,7 +114,7 @@ export interface LogFullDetail extends LogDetail {
 export interface ChatMessage {
   id?: number
   session_id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'tool' | 'system'
   content: string
   timestamp: string
 }
@@ -126,6 +125,11 @@ export interface ChatSession {
   created_at: string
   updated_at: string
   messages: ChatMessage[]
+}
+
+export interface AIAnalysisResponse {
+  intermediate_steps: { tool: string; args: string; result: string }[]
+  final_answer: string
 }
 
 // used for the charts on the overview page
@@ -156,11 +160,29 @@ export const api = {
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
       return res.json()
     },
-    addMessage: async (sessionId: string, role: 'user' | 'assistant', content: string) => {
+    addMessage: async (sessionId: string, role: string, content: string) => {
       const res = await fetch(`${BASE_URL}/chats/${sessionId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role, content }),
+      })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      return res.json()
+    },
+    completion: async (messages: { role: string; content: string }[], logId?: string) => {
+      const res = await fetch(`${BASE_URL}/chats/completion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, log_id: logId }),
+      })
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+      return res.json()
+    },
+    analyze: async (messages: { role: string; content: string }[]) => {
+      const res = await fetch(`${BASE_URL}/chats/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages }),
       })
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
       return res.json()

@@ -40,7 +40,7 @@ Derived health metrics for the three AI agents (Classifier, Analyst, Responder).
 | Charts | Recharts |
 | Icons | Lucide React |
 | Fonts | DM Serif Display, DM Mono, DM Sans |
-| AI chat | OpenAI GPT-4.1 via direct API calls from the browser |
+| AI chat | OpenAI via Backend Proxy (Gateway) |
 
 ---
 
@@ -48,7 +48,7 @@ Derived health metrics for the three AI agents (Classifier, Analyst, Responder).
 
 - Node.js 18+
 - The [gateway](https://github.com/Admin-or-Admin/gateway) running on port 8000
-- An OpenAI API key (for the AI Analyst page only)
+- An OpenAI API key (Set in the Gateway environment, NOT here)
 
 ---
 
@@ -60,6 +60,9 @@ npm install
 
 # copy the env file and fill in your values
 cp .env.example .env
+
+# generate the env-config.js for local dev
+npm run generate-env
 
 # start the dev server
 npm run dev
@@ -74,9 +77,6 @@ Opens at `http://localhost:5173`.
 ```properties
 # URL of the running gateway — defaults to localhost:8000 if not set
 VITE_API_URL=http://localhost:8000
-
-# OpenAI key for the AI Analyst page
-VITE_OPENAI_API_KEY=sk-...
 ```
 
 ---
