@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "generate-env": "node ./generate-env.js",
+    "generate-env": "node ./generate-env.cjs",
     "dev": "npm run generate-env && vite",
     "build": "npm run generate-env && tsc && vite build",
     "preview": "vite preview"

@@ -16,7 +16,7 @@ RUN apk add --no-cache nodejs
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy the generator script
-COPY --from=build /app/generate-env.js /app/generate-env.js
+COPY --from=build /app/generate-env.cjs /app/generate-env.cjs
 
 # Set the output path for the runtime config
 ENV ENV_CONFIG_OUTPUT=/usr/share/nginx/html/env-config.js
@@ -32,4 +32,4 @@ RUN echo 'server { \
 }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
-CMD ["sh", "-c", "node /app/generate-env.js && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "node /app/generate-env.cjs && nginx -g 'daemon off;'"]
