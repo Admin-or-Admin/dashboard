@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Send, Bot, User, ChevronDown, ChevronUp } from 'lucide-react'
+import { Send, Bot, User, ChevronDown, ChevronUp, History } from 'lucide-react'
 import { api, LogFullDetail } from '../lib/api'
 import { SeverityBadge, CategoryBadge, PriorityBar, Timestamp } from '../components/ui'
 import { ChatSidebar } from '../components/ChatSidebar'
@@ -219,9 +219,13 @@ export default function AgentChat({ logContext }: AgentChatProps) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 1024)
+  
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const skipNextFetch = useRef(false)
+
+  const isMobile = window.innerWidth < 1024
 
   useEffect(() => {
     if (sessionId) {
@@ -278,7 +282,6 @@ export default function AgentChat({ logContext }: AgentChatProps) {
 
     const userMsg: Message = { role: 'user', content: text, timestamp: new Date() }
     
-    // 1. Update local UI state immediately (Optimistic Update)
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setLoading(true)
@@ -287,18 +290,15 @@ export default function AgentChat({ logContext }: AgentChatProps) {
     let currentSessionId = sessionId
     
     try {
-      // 2. Create session if it doesn't exist
       if (!currentSessionId) {
         currentSessionId = crypto.randomUUID()
         await api.chats.create(currentSessionId, text.slice(0, 40) + (text.length > 40 ? '...' : ''))
-        skipNextFetch.current = true // Don't trigger loadSession when sessionId changes
+        skipNextFetch.current = true
         setSessionId(currentSessionId)
       }
 
-      // 3. Save user message to database
       await api.chats.addMessage(currentSessionId, 'user', text)
 
-      // 4. Get AI Response
       const history = [...messages, userMsg].map(m => ({
         role: m.role,
         content: m.content,
@@ -307,10 +307,8 @@ export default function AgentChat({ logContext }: AgentChatProps) {
       const data = await api.chats.completion(history, logContext?.id)
       const reply = data.content
 
-      // 5. Save assistant response to database
       await api.chats.addMessage(currentSessionId, 'assistant', reply)
 
-      // 6. Final UI update
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: reply,
@@ -342,13 +340,38 @@ export default function AgentChat({ logContext }: AgentChatProps) {
   ]
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
       <ChatSidebar 
         currentSessionId={sessionId} 
         onSelectSession={setSessionId} 
-        onNewChat={handleNewChat} 
+        onNewChat={handleNewChat}
+        isCollapsed={isCollapsed}
+        onToggleCollapse={setIsCollapsed}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Mobile Header with History Toggle */}
+        {isMobile && isCollapsed && (
+          <div style={{ 
+            padding: '8px 16px', 
+            borderBottom: '1px solid var(--rule)', 
+            display: 'flex', 
+            alignItems: 'center',
+            background: 'var(--surface)',
+            flexShrink: 0
+          }}>
+            <button 
+              onClick={() => setIsCollapsed(false)}
+              style={{
+                background: 'none', border: 'none', color: 'var(--ink-2)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500
+              }}
+            >
+              <History size={16} color="var(--teal)" />
+              History
+            </button>
+          </div>
+        )}
+
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
           {messages.map((msg, i) => (
             <MessageBubble key={i} msg={msg} />

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Activity, AlertTriangle,
   Shield, Wrench, Radio, ChevronRight, MessageSquare, BrainCircuit
@@ -48,6 +48,19 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [chatContext, setChatContext] = useState<LogFullDetail | null>(null)
   const [analystMessage, setAnalystMessage] = useState<string | undefined>(undefined)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 1024)
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setSidebarCollapsed(true)
+      } else {
+        setSidebarCollapsed(false)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   function refresh() { setRefreshKey(k => k + 1) }
 
@@ -63,8 +76,16 @@ export default function App() {
 
   return (
     <div className="layout">
+      {!sidebarCollapsed && window.innerWidth < 1024 && (
+        <div 
+          onClick={() => setSidebarCollapsed(true)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999
+          }}
+        />
+      )}
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-logo">
           <div className="sidebar-logo-mark">
             <svg viewBox="0 0 28 28" fill="none">
@@ -72,56 +93,82 @@ export default function App() {
               <path d="M14 4L22 9V19L14 24L6 19V9L14 4Z" stroke="currentColor" strokeWidth="1.5" fill="none" />
               <circle cx="14" cy="14" r="3" fill="currentColor" />
             </svg>
-            <div>
-              <div className="sidebar-logo-text">CyberControl</div>
-              <div className="sidebar-logo-sub">Aurora Platform</div>
-            </div>
+            {!sidebarCollapsed && (
+              <div>
+                <div className="sidebar-logo-text">CyberControl</div>
+                <div className="sidebar-logo-sub">Aurora Platform</div>
+              </div>
+            )}
           </div>
         </div>
 
         <nav className="sidebar-nav">
-          <div className="nav-section-label">Navigation</div>
+          <div className="nav-section-label">{sidebarCollapsed ? '•' : 'Navigation'}</div>
           {NAV.map(item => (
             <button
               key={item.id}
               className={`nav-item ${page === item.id ? 'active' : ''}`}
-              onClick={() => setPage(item.id)}
+              onClick={() => {
+                setPage(item.id)
+                if (window.innerWidth < 1024) setSidebarCollapsed(true)
+              }}
+              title={sidebarCollapsed ? item.label : ''}
             >
               {item.icon}
-              {item.label}
+              {!sidebarCollapsed && item.label}
             </button>
           ))}
 
-          <div className="nav-section-label" style={{ marginTop: 8 }}>Assistant</div>
+          <div className="nav-section-label" style={{ marginTop: 8 }}>{sidebarCollapsed ? '•' : 'Assistant'}</div>
           <button
             className={`nav-item ${page === 'chat' ? 'active' : ''}`}
-            onClick={() => openChat()}
+            onClick={() => {
+              openChat()
+              if (window.innerWidth < 1024) setSidebarCollapsed(true)
+            }}
+            title={sidebarCollapsed ? 'Analyst Chat' : ''}
           >
             <MessageSquare size={15} />
-            Analyst Chat
+            {!sidebarCollapsed && 'Analyst Chat'}
           </button>
         </nav>
 
-        <div className="sidebar-footer">
-          v0.0.1 · Aurora
-        </div>
+        {!sidebarCollapsed && (
+          <div className="sidebar-footer">
+            v0.0.1 · Aurora
+          </div>
+        )}
       </aside>
 
       {/* Main area */}
       <div className="main">
         <header className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Aurora</span>
-            <ChevronRight size={13} color="var(--ink-3)" />
-            <span className="topbar-title">{PAGE_TITLES[page]}</span>
-            {page === 'chat' && chatContext && (
-              <>
-                <ChevronRight size={13} color="var(--ink-3)" />
-                <span style={{ fontSize: 12, color: 'var(--teal)', fontFamily: 'var(--font-mono)' }}>
-                  {chatContext.id.slice(0, 12)}…
-                </span>
-              </>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button 
+              className="menu-toggle"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{
+                background: 'none', border: 'none', color: 'var(--ink-3)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', padding: 4, borderRadius: 4
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
+                <path d="M3 12h18M3 6h18M3 18h18" />
+              </svg>
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Aurora</span>
+              <ChevronRight size={13} color="var(--ink-3)" />
+              <span className="topbar-title">{PAGE_TITLES[page]}</span>
+              {page === 'chat' && chatContext && (
+                <>
+                  <ChevronRight size={13} color="var(--ink-3)" />
+                  <span style={{ fontSize: 12, color: 'var(--teal)', fontFamily: 'var(--font-mono)' }}>
+                    {chatContext.id.slice(0, 12)}…
+                  </span>
+                </>
+              )}
+            </div>
           </div>
           <div className="topbar-right">
             <span style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Send, Bot, User, Search, FileText, X, Loader, Wrench } from 'lucide-react'
+import { Send, Bot, User, Search, FileText, X, Loader, Wrench, History } from 'lucide-react'
 import { api, Log, AIAnalysisResponse } from '../lib/api'
 import { ChatSidebar } from '../components/ChatSidebar'
 
@@ -59,7 +59,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === 'user'
 
   const renderContent = (text: string) => {
-    const parts = text.split(/(```[\s\S]*?```|`[^`\n]+`)/g)
+    const parts = text.split(/(```[\s\S]*?```|`[^` \n]+`)/g)
     return parts.map((part, i) => {
       if (part.startsWith('```') && part.endsWith('```')) {
         const lines = part.slice(3, -3).split('\n')
@@ -255,11 +255,15 @@ export default function AIAnalyst({ initialMessage }: { initialMessage?: string 
   const [showPicker, setShowPicker] = useState(false)
   const [pasteMode, setPasteMode] = useState(false)
   const [pastedLog, setPastedLog] = useState('')
+  const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 1024)
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputAreaRef = useRef<HTMLDivElement>(null)
   const didAutoSend = useRef(false)
   const skipNextFetch = useRef(false)
+
+  const isMobile = window.innerWidth < 1024
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -387,13 +391,38 @@ export default function AIAnalyst({ initialMessage }: { initialMessage?: string 
   const isEmpty = displayMessages.length === 0
 
   return (
-    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', position: 'relative' }}>
       <ChatSidebar 
         currentSessionId={sessionId} 
         onSelectSession={setSessionId} 
-        onNewChat={handleNewChat} 
+        onNewChat={handleNewChat}
+        isCollapsed={isCollapsed}
+        onToggleCollapse={setIsCollapsed}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', padding: '16px' }}>
+        {/* Mobile Header with History Toggle */}
+        {isMobile && isCollapsed && (
+          <div style={{ 
+            padding: '0 0 12px', 
+            borderBottom: '1px solid var(--rule)', 
+            display: 'flex', 
+            alignItems: 'center',
+            marginBottom: 12,
+            flexShrink: 0
+          }}>
+            <button 
+              onClick={() => setIsCollapsed(false)}
+              style={{
+                background: 'none', border: 'none', color: 'var(--ink-2)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500
+              }}
+            >
+              <History size={16} color="var(--teal)" />
+              History
+            </button>
+          </div>
+        )}
+
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 4px 8px' }}>
 
         {isEmpty && (
