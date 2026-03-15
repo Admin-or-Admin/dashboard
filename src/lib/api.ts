@@ -1,17 +1,20 @@
 // gateway runs on 8000 locally, override with VITE_API_URL in .env
 const BASE_URL = (window as any).env?.VITE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-// generic GET wrapper, builds the full URL with query params and parses the JSON response
-// T is whatever type we expect back (Log[], Incident, etc.)
-async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
-  const url = new URL(BASE_URL + path)
-  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
-  const res = await fetch(url.toString())
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-  return res.json()
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: number
+  username: string
+  email: string
+  is_active: boolean
+  created_at: string
 }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+export interface Token {
+  access_token: string
+  token_type: string
+}
 
 // mirrors the logs table in postgres — raw log as it came off kafka
 export interface Log {
@@ -137,63 +140,98 @@ export interface SeverityStat { severity: string; count: number }
 export interface TrendPoint { date: string; count: number }
 export interface ServiceStat { service_name: string; count: number }
 
+// ── Generic Request Wrapper ───────────────────────────────────────────────────
+
+async function request<T>(
+  path: string, 
+  options: RequestInit = {}, 
+  params?: Record<string, string | number>
+): Promise<T> {
+  const url = new URL(BASE_URL + path)
+  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)))
+  
+  const token = localStorage.getItem('aurora_token')
+  const headers = new Headers(options.headers)
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+  
+  const res = await fetch(url.toString(), { ...options, headers })
+  
+  if (res.status === 401) {
+    localStorage.removeItem('aurora_token')
+    if (!window.location.pathname.includes('/login')) {
+      window.location.href = '/login'
+    }
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(error.detail || `${res.status} ${res.statusText}`)
+  }
+  
+  return res.json()
+}
+
+async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
+  return request<T>(path, { method: 'GET' }, params)
+}
+
 // ── API calls ─────────────────────────────────────────────────────────────────
 
-// all gateway calls go through here, one place to change if the gateway moves
 export const api = {
+  auth: {
+    login: async (formData: FormData) => {
+      // OAuth2 Password flow uses x-www-form-urlencoded
+      return request<Token>('/auth/login', {
+        method: 'POST',
+        body: formData,
+      })
+    },
+    register: async (userData: any) => {
+      return request<User>('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      })
+    },
+    me: () => get<User>('/auth/me'),
+  },
   logs: {
     list: (limit = 100, offset = 0, service_name?: string) =>
       get<Log[]>('/logs', service_name ? { limit, offset, service_name } : { limit, offset }),
     get: (id: string) => get<Log>(`/logs/${id}`),
-    details: (id: string) => get<LogDetail>(`/logs/${id}/details`), // log + classification + threat
-    full: (id: string) => get<LogFullDetail>(`/logs/${id}/full`),   // everything including incident + remediation
+    details: (id: string) => get<LogDetail>(`/logs/${id}/details`),
+    full: (id: string) => get<LogFullDetail>(`/logs/${id}/full`),
   },
   chats: {
     list: () => get<ChatSession[]>('/chats'),
     get: (id: string) => get<ChatSession>(`/chats/${id}`),
-    create: async (id: string, title?: string) => {
-      const res = await fetch(`${BASE_URL}/chats`, {
+    create: (id: string, title?: string) => 
+      request<ChatSession>('/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, title }),
-      })
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-      return res.json()
-    },
-    addMessage: async (sessionId: string, role: string, content: string) => {
-      const res = await fetch(`${BASE_URL}/chats/${sessionId}/messages`, {
+      }),
+    addMessage: (sessionId: string, role: string, content: string) =>
+      request<ChatMessage>(`/chats/${sessionId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role, content }),
-      })
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-      return res.json()
-    },
-    completion: async (messages: { role: string; content: string }[], logId?: string) => {
-      const res = await fetch(`${BASE_URL}/chats/completion`, {
+      }),
+    completion: (messages: { role: string; content: string }[], logId?: string) =>
+      request<{ content: string }>('/chats/completion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages, log_id: logId }),
-      })
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-      return res.json()
-    },
-    analyze: async (messages: { role: string; content: string }[]) => {
-      const res = await fetch(`${BASE_URL}/chats/analyze`, {
+      }),
+    analyze: (messages: { role: string; content: string }[]) =>
+      request<AIAnalysisResponse>('/chats/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages }),
-      })
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-      return res.json()
-    },
-    delete: async (id: string) => {
-      const res = await fetch(`${BASE_URL}/chats/${id}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-      return res.json()
-    },
+      }),
+    delete: (id: string) => request<void>(`/chats/${id}`, { method: 'DELETE' }),
   },
   classifications: {
     list: (limit = 100, offset = 0) => get<Classification[]>('/classifications', { limit, offset }),
@@ -212,21 +250,19 @@ export const api = {
   remediation: {
     list: (limit = 100, offset = 0) => get<RemediationStep[]>('/remediation', { limit, offset }),
     byLog: (log_id: string) => get<RemediationStep[]>(`/remediation/log/${log_id}`),
-    // PATCH endpoint, writes approval decision to the db
-    updateStatus: async (id: number, status: 'approved' | 'denied') => {
-      const res = await fetch(`${BASE_URL}/remediation/${id}`, {
+    updateStatus: (id: number, status: string) =>
+      request<any>(`/remediation/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
-      })
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-      return res.json()
-    },
+      }),
   },
   stats: {
-    // these three feed the charts on the overview page
     severity: () => get<SeverityStat[]>('/stats/severity'),
-    trend: () => get<TrendPoint[]>('/stats/incidents/trend'),
     services: () => get<ServiceStat[]>('/stats/services'),
+    trend: () => get<TrendPoint[]>('/stats/incidents/trend'),
   },
+  health: {
+    check: () => get<any>('/health'),
+  }
 }

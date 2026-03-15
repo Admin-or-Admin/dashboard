@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Activity, AlertTriangle,
-  Shield, Wrench, Radio, ChevronRight, MessageSquare, BrainCircuit
+  Shield, Wrench, Radio, ChevronRight, MessageSquare, BrainCircuit,
+  LogOut, User as UserIcon
 } from 'lucide-react'
 import Overview from './pages/Overview'
 import LogStream from './pages/LogStream'
@@ -11,6 +12,8 @@ import Remediation from './pages/Remediation'
 import AgentMonitor from './pages/AgentMonitor'
 import AgentChat from './pages/AgentChat'
 import AIAnalyst from './pages/AIAnalyst'
+import Login from './pages/Login'
+import { useAuth } from './lib/AuthContext'
 import { LogFullDetail } from './lib/api'
 import './index.css'
 
@@ -44,6 +47,7 @@ const PAGE_TITLES: Record<Page, string> = {
 }
 
 export default function App() {
+  const { user, isAuthenticated, loading, logout } = useAuth()
   const [page, setPage] = useState<Page>('overview')
   const [refreshKey, setRefreshKey] = useState(0)
   const [chatContext, setChatContext] = useState<LogFullDetail | null>(null)
@@ -72,6 +76,21 @@ export default function App() {
   function openAnalystWithContext(logId: string, context: string) {
     setAnalystMessage(`Investigate log ID ${logId} in full detail. Context: ${context}`)
     setPage('analyst')
+  }
+
+  if (loading) {
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg-1)', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 13
+      }}>
+        Initializing Aurora...
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Login />
   }
 
   return (
@@ -133,11 +152,48 @@ export default function App() {
           </button>
         </nav>
 
-        {!sidebarCollapsed && (
-          <div className="sidebar-footer">
-            v0.0.1 · Aurora
-          </div>
-        )}
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border-2)', paddingTop: 12 }}>
+          {sidebarCollapsed ? (
+             <button 
+              className="nav-item" 
+              onClick={logout} 
+              style={{ width: '100%', justifyContent: 'center', padding: '10px 0' }}
+              title="Sign Out"
+            >
+               <LogOut size={15} />
+             </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 4px' }}>
+                <div style={{ 
+                  width: 24, height: 24, borderRadius: '50%', background: 'var(--teal-light)', 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--teal)'
+                }}>
+                  <UserIcon size={14} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {user?.username}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>Operator</div>
+                </div>
+                <button 
+                  onClick={logout}
+                  style={{ 
+                    background: 'none', border: 'none', color: 'var(--ink-3)', 
+                    cursor: 'pointer', display: 'flex', alignItems: 'center'
+                  }}
+                  title="Sign Out"
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--ink-4)', textAlign: 'center' }}>
+                v1.1.0 · Aurora Security
+              </div>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* Main area */}
